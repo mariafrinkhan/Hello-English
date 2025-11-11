@@ -1,6 +1,7 @@
 from rest_framework import serializers
-from .models import Banner, User, Instruction, Content
+from .models import *
 from deep_translator import GoogleTranslator  # for automatic translation
+from rest_framework.exceptions import ValidationError
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -9,104 +10,297 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'email']
 
 
-class ContentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Content
-        fields = '__all__'
-
-
-
-
-
 class InstructionSerializer(serializers.ModelSerializer):
-    contents_en = serializers.ListField(
-        child=serializers.CharField(), write_only=True, required=True
-    )
-    contents_bn = serializers.ListField(
-        child=serializers.CharField(), write_only=True, required=False
-    )
-    # Read-only output
-    contents_en_output = serializers.SerializerMethodField(read_only=True)
-    contents_bn_output = serializers.SerializerMethodField(read_only=True)
-
     class Meta:
         model = Instruction
+        fields = ['id', 'page', 'title_en', 'content']
+
+
+class QuestionSerializer(serializers.ModelSerializer):
+    correct_answer = serializers.CharField(required=False, allow_blank=True)
+    quiz = serializers.PrimaryKeyRelatedField(
+        queryset=Quiz.objects.all(), required=False
+    )  # optional for direct POST
+    options = serializers.ListField(
+        child=serializers.CharField(), write_only=True, required=False
+    )
+    options_output = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = Question
         fields = [
-            'id',
-            'page_en',
-            'title_en',
-            'page_bn',
-            'title_bn',
-            'contents_en',
-            'contents_bn',
-            'contents_en_output',
-            'contents_bn_output',
+            "id",
+            "quiz",
+            "question",
+            "qus_time",
+            "options",
+            "options_output",
+            "correct_answer",
+            "explain"
         ]
 
-    # Output methods
-    def get_contents_en_output(self, obj):
-        return [c.content_en for c in obj.contents.all()]
+    def validate(self, data):
+        quiz = data.get("quiz") or getattr(self.instance, "quiz", None)
+        question_text = data.get("question", "").strip()
 
-    def get_contents_bn_output(self, obj):
-        return [c.content_bn for c in obj.contents.all()]
+        if quiz:
+            qs = Question.objects.filter(quiz=quiz, question__iexact=question_text)
+            if self.instance:
+                qs = qs.exclude(id=self.instance.id)
+            if qs.exists():
+                raise ValidationError(f"Question '{question_text}' already exists in this quiz.")
+        return data
 
-    # Create
     def create(self, validated_data):
-        contents_en = validated_data.pop('contents_en', [])
-        contents_bn = validated_data.pop('contents_bn', [])
+        options_data = validated_data.pop("options", [])
+        question = Question.objects.create(**validated_data)
+        for opt_text in options_data:
+            Option.objects.create(question=question, option_text=opt_text)
+        return question
 
-        # Auto-translate if contents_bn is empty
-        if not contents_bn:
-            contents_bn = [GoogleTranslator(source='en', target='bn').translate(text) for text in contents_en]
-
-        instruction = Instruction.objects.create(**validated_data)
-
-        for en, bn in zip(contents_en, contents_bn):
-            Content.objects.create(
-                ins_title_en=instruction,
-                content_en=en,
-                content_bn=bn
-            )
-
-        return instruction
-
-    # Update
     def update(self, instance, validated_data):
-        contents_en = validated_data.pop('contents_en', None)
-        contents_bn = validated_data.pop('contents_bn', None)
+        # Update basic fields
+        for attr, value in validated_data.items():
+            if attr != "options":
+                setattr(instance, attr, value)
+        instance.save()
 
-        # update instruction fields
+        # Update options if provided
+        options_data = validated_data.get("options")
+        if options_data is not None:
+            # Delete old options
+            instance.options.all().delete()
+            # Create new options
+            for opt_text in options_data:
+                Option.objects.create(question=instance, option_text=opt_text)
+
+        return instance
+
+    def get_options_output(self, instance):
+        return [opt.option_text for opt in instance.options.all()]
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        options_list = rep.pop("options_output", [])
+        return {
+            "id": rep["id"],
+            "quiz": rep.get("quiz"),
+            "question": rep["question"],
+            "qus_time": rep.get("qus_time"),
+            "options": options_list,
+            "correct_answer": rep.get("correct_answer"),
+            "explain": rep.get("explain")
+        }
+
+
+class QuizSerializer(serializers.ModelSerializer):
+    all_questions = QuestionSerializer(many=True)
+    instruction = InstructionSerializer(many=True)
+
+    class Meta:
+        model = Quiz
+        fields = ['id', 'title', 'description', 'timer_duration', 'total_questions', 'instruction', 'all_questions']
+
+    def create(self, validated_data):
+        instructions_data = validated_data.pop('instruction', [])
+        questions_data = validated_data.pop('all_questions', [])
+        quiz = Quiz.objects.create(**validated_data)
+
+        # Add instructions
+        for instr_data in instructions_data:
+            instr, created = Instruction.objects.get_or_create(**instr_data)
+            quiz.instruction.add(instr)
+
+        # Add questions
+        for ques_data in questions_data:
+            options_data = ques_data.pop('options', [])  # safely pop options
+            ques_data.pop('quiz', None)  # remove quiz key if exists
+            question = Question.objects.create(quiz=quiz, **ques_data)
+
+            # Create options
+            for opt_text in options_data:
+                Option.objects.create(question=question, option_text=opt_text)
+
+        return quiz
+
+
+class QuizListSerializer(serializers.ModelSerializer):
+    instruction = serializers.SerializerMethodField()
+    total_instruction_pages = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Quiz
+        fields = ["id", "title", "description", "timer_duration", "total_questions","total_instruction_pages", "instruction"]
+
+    def get_instruction(self, obj):
+        # Include the ID so you can update the instruction later
+        return [
+            {
+                "id": ins.id,  # <--- instruction PK
+                "page": ins.page,
+                "title_en": ins.title_en,
+                "content": ins.content
+            }
+            for ins in obj.instruction.all()
+        ]
+    
+    def get_total_instruction_pages(self, obj):
+        # Return the highest page number among instructions
+        pages = obj.instruction.values_list('page', flat=True)
+        return max(pages) if pages else 0
+
+
+class BannerSerializer(serializers.ModelSerializer):
+    quiz_title = serializers.SerializerMethodField()
+    quiz = serializers.SerializerMethodField()  # for nested quiz info
+    quiz_id = serializers.PrimaryKeyRelatedField(
+        queryset=Quiz.objects.all(), source='quiz', write_only=True, required=False
+    )
+
+    # Make Bangla fields read-only; they will be auto-translated
+    title_bangla = serializers.CharField(read_only=True)
+    subtitle_bangla = serializers.CharField(read_only=True)
+    button_bangla = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = Banner
+        # Exclude 'page' if you don't need it
+        exclude = ('page', )
+
+    def get_quiz_title(self, obj):
+        return obj.quiz.title if obj.quiz else ""
+
+    def get_quiz(self, obj):
+        if obj.quiz:
+            return {"id": obj.quiz.id, "title": obj.quiz.title}
+        return {"id": None, "title": None}
+
+    def create(self, validated_data):
+        # Auto-translate English fields to Bangla
+        if 'title_english' in validated_data:
+            validated_data['title_bangla'] = GoogleTranslator(source='en', target='bn').translate(validated_data['title_english'])
+        if 'subtitle_english' in validated_data:
+            validated_data['subtitle_bangla'] = GoogleTranslator(source='en', target='bn').translate(validated_data['subtitle_english'])
+        if 'button_english' in validated_data:
+            validated_data['button_bangla'] = GoogleTranslator(source='en', target='bn').translate(validated_data['button_english'])
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        # Auto-translate on update
+        if 'title_english' in validated_data:
+            instance.title_bangla = GoogleTranslator(source='en', target='bn').translate(validated_data['title_english'])
+        if 'subtitle_english' in validated_data:
+            instance.subtitle_bangla = GoogleTranslator(source='en', target='bn').translate(validated_data['subtitle_english'])
+        if 'button_english' in validated_data:
+            instance.button_bangla = GoogleTranslator(source='en', target='bn').translate(validated_data['button_english'])
+        return super().update(instance, validated_data)
+
+
+class InstructionNestedSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Instruction
+        fields = ['id', 'page', 'title_en', 'content']
+        extra_kwargs = {'id': {'read_only': False}}  # allow using id for updates
+
+class QuizDetailSerializer(serializers.ModelSerializer):
+    instructions = InstructionNestedSerializer(many=True, source='instruction')
+    total_instruction_pages = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Quiz
+        fields = ["id", "title", "description", "timer_duration", "total_questions","total_instruction_pages", "instructions"]
+        
+
+    def update(self, instance, validated_data):
+        # Get instructions from validated_data if provided
+        instructions_data = validated_data.pop('instruction', None)
+
+        if instructions_data is not None:
+            # Option 1: Replace all instructions
+            instance.instruction.clear()
+
+            # Add new instructions
+            for instr_data in instructions_data:
+                # Remove 'id' if present to avoid UNIQUE errors
+                instr_data.pop('id', None)
+                instr = Instruction.objects.create(**instr_data)
+                instance.instruction.add(instr)
+
+        # Update other quiz fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
 
-        # update contents
-        if contents_en is not None:
-            instance.contents.all().delete()
-            if not contents_bn:
-                contents_bn = [GoogleTranslator(source='en', target='bn').translate(text) for text in contents_en]
+        return instance
+    
 
-            for en, bn in zip(contents_en, contents_bn):
-                Content.objects.create(
-                    ins_title_en=instance,
-                    content_en=en,
-                    content_bn=bn
-                )
+    def get_total_instruction_pages(self, obj):
+        # Return the highest page number among instructions
+        pages = obj.instruction.values_list('page', flat=True)
+        return max(pages) if pages else 0
+
+
+class FeatureSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Feature
+        fields = ['text']
+
+class PlanSerializer(serializers.ModelSerializer):
+    # Input field for features (write-only)
+    features = serializers.ListField(
+        child=serializers.CharField(),
+        write_only=True,
+        required=False
+    )
+
+    class Meta:
+        model = Plan
+        fields = [
+            "id",
+            "name",
+            "description",
+            "monthly_price",
+            "yearly_price",
+            "popular",
+            "button_text",
+            "button_variant",
+            "color",
+            "icon",
+            "features"
+        ]
+
+    def create(self, validated_data):
+        features_data = validated_data.pop('features', [])
+        plan = Plan.objects.create(**validated_data)
+        for feature_text in features_data:
+            Feature.objects.create(plan=plan, text=feature_text)
+        return plan
+
+    def update(self, instance, validated_data):
+        features_data = validated_data.pop('features', None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        if features_data is not None:
+            instance.features.all().delete()
+            for feature_text in features_data:
+                Feature.objects.create(plan=instance, text=feature_text)
 
         return instance
 
-    # Rename output fields
     def to_representation(self, instance):
         rep = super().to_representation(instance)
-        rep['contents_en'] = rep.pop('contents_en_output')
-        rep['contents_bn'] = rep.pop('contents_bn_output')
-        return rep
-
-
-
-
-
-class BannerSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Banner
-        fields = '__all__'
+        # Insert features after 'popular'
+        features_list = [f.text for f in instance.features.all()]
+        new_rep = {}
+        for key in [
+            "id", "name", "description", "monthly_price", "yearly_price",
+            "popular", "features", "button_text", "button_variant", "color", "icon"
+        ]:
+            if key == "features":
+                new_rep[key] = features_list
+            else:
+                new_rep[key] = rep.get(key)
+        return new_rep

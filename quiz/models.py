@@ -1,9 +1,12 @@
 from django.db import models
 from django.contrib.auth.models import User
 from deep_translator import GoogleTranslator
+from django_ckeditor_5.fields import CKEditor5Field
 
 
 class Banner(models.Model):
+    quiz = models.ForeignKey('Quiz', related_name='banners', null=True, blank=True, on_delete=models.SET_NULL)
+
     # english inputs (what user will provide)
     title_english = models.CharField(max_length=255)
     subtitle_english = models.TextField(blank=True, null=True)
@@ -41,56 +44,64 @@ class Banner(models.Model):
         return self.title_english
 
 
-    
-
 class Instruction(models.Model):
-    page_en = models.PositiveIntegerField(null=True, blank=True)
+    # quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='instructions', null=True, blank=True)
+    page = models.PositiveIntegerField(null=True, blank=True)
     title_en = models.CharField(max_length=255, null=True, blank=True)
-
-    page_bn = models.CharField(max_length=50, null=True, blank=True)
-    title_bn = models.CharField(max_length=255, null=True, blank=True)
-
-    def save(self, *args, **kwargs):
-        translator = GoogleTranslator(source='en', target='bn')
-
-        if not self.page_bn and self.page_en:
-            self.page_bn = translator.translate(str(self.page_en))
-
-        if not self.title_bn and self.title_en:
-            self.title_bn = translator.translate(self.title_en)
-
-        super().save(*args, **kwargs)
+    # contents = JSONField(default=list, blank=True)  # stores list of strings
+    content = CKEditor5Field(config_name='extends', blank=True, null=True)
 
     def __str__(self):
-        return f"Instruction Title: {self.title_en}"
-        
-
-class Content(models.Model):
-    ins_title_en = models.ForeignKey(Instruction, related_name='contents', on_delete=models.CASCADE)
-    content_en = models.TextField(null=True, blank=True)
-
-    ins_title_bn = models.CharField(max_length=255, null=True, blank=True)
-    content_bn = models.TextField(null=True, blank=True)
-
-    def save(self, *args, **kwargs):
-        translator = GoogleTranslator(source='en', target='bn')
-
-        if not self.ins_title_bn and self.ins_title_en and self.ins_title_en.title_en:
-            self.ins_title_bn = translator.translate(self.ins_title_en.title_en)
-
-        if not self.content_bn and self.content_en:
-            self.content_bn = translator.translate(self.content_en)
-
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f"Content: {self.content_en[:50]}"
-
-
-
-
-
+        return f"Instruction Title: {self.title_en or 'Untitled'}"
     
+class Quiz(models.Model):
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    timer_duration = models.PositiveIntegerField(default=0)  # in minutes
+    total_questions = models.PositiveIntegerField(default=0)
+    instruction = models.ManyToManyField(Instruction, blank=True)
+    
+    def __str__(self):
+        return self.title
 
 
+class Question(models.Model):
+    quiz = models.ForeignKey(Quiz, related_name="all_questions", on_delete=models.CASCADE)
+    question = models.TextField()
+    correct_answer = models.CharField(max_length=255)
+    qus_time = models.PositiveIntegerField(null=True, blank=True)
+    explain = models.TextField(blank=True, null=True)
 
+    def __str__(self):
+        return self.question
+
+
+class Option(models.Model):
+    question = models.ForeignKey(Question, related_name="options", on_delete=models.CASCADE)
+    option_text = models.CharField(max_length=255)
+
+    def __str__(self):
+        return self.option_text
+
+
+class Plan(models.Model):
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    monthly_price = models.DecimalField(max_digits=10, decimal_places=2)
+    yearly_price = models.DecimalField(max_digits=10, decimal_places=2)
+    popular = models.BooleanField(default=False)
+    button_text = models.CharField(max_length=100, blank=True)
+    button_variant = models.CharField(max_length=50, blank=True)
+    color = models.CharField(max_length=20, blank=True)
+    icon = models.CharField(max_length=100, blank=True)
+
+    def __str__(self):
+        return self.name
+
+
+class Feature(models.Model):
+    plan = models.ForeignKey(Plan, related_name='features', on_delete=models.CASCADE)
+    text = models.CharField(max_length=255)
+
+    def __str__(self):
+        return self.text
