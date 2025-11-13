@@ -8,7 +8,7 @@ router.register('instructions', InstructionViewSet, basename='instruction')
 router.register('quizzes', QuizViewSet, basename='quiz')
 router.register('questions', QuestionViewSet, basename='question')
 router.register('get_quiz', GetQuizViewSet, basename='get_quiz')
-router.register('plans', PlanViewSet, basename='plan')
+router.register('subscriptions', PlanViewSet, basename='plan')
 
 
 
