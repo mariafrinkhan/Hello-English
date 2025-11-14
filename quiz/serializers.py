@@ -93,6 +93,36 @@ class QuestionSerializer(serializers.ModelSerializer):
         }
 
 
+# class QuizSerializer(serializers.ModelSerializer):
+#     all_questions = QuestionSerializer(many=True)
+#     instruction = InstructionSerializer(many=True)
+
+#     class Meta:
+#         model = Quiz
+#         fields = ['id', 'title', 'description', 'timer_duration', 'total_questions', 'instruction', 'all_questions']
+
+#     def create(self, validated_data):
+#         instructions_data = validated_data.pop('instruction', [])
+#         questions_data = validated_data.pop('all_questions', [])
+#         quiz = Quiz.objects.create(**validated_data)
+
+#         # Add instructions
+#         for instr_data in instructions_data:
+#             instr, created = Instruction.objects.get_or_create(**instr_data)
+#             quiz.instruction.add(instr)
+
+#         # Add questions
+#         for ques_data in questions_data:
+#             options_data = ques_data.pop('options', [])  # safely pop options
+#             ques_data.pop('quiz', None)  # remove quiz key if exists
+#             question = Question.objects.create(quiz=quiz, **ques_data)
+
+#             # Create options
+#             for opt_text in options_data:
+#                 Option.objects.create(question=question, option_text=opt_text)
+
+#         return quiz
+
 class QuizSerializer(serializers.ModelSerializer):
     all_questions = QuestionSerializer(many=True)
     instruction = InstructionSerializer(many=True)
@@ -111,10 +141,20 @@ class QuizSerializer(serializers.ModelSerializer):
             instr, created = Instruction.objects.get_or_create(**instr_data)
             quiz.instruction.add(instr)
 
+        # Calculate time per question
+        total_questions = len(questions_data)
+        total_time = quiz.timer_duration or 0
+        per_question_time = total_time // total_questions if total_questions > 0 else 0
+
         # Add questions
         for ques_data in questions_data:
             options_data = ques_data.pop('options', [])  # safely pop options
             ques_data.pop('quiz', None)  # remove quiz key if exists
+
+            # Set qus_time if not provided
+            if not ques_data.get('qus_time'):
+                ques_data['qus_time'] = per_question_time
+
             question = Question.objects.create(quiz=quiz, **ques_data)
 
             # Create options
@@ -122,6 +162,7 @@ class QuizSerializer(serializers.ModelSerializer):
                 Option.objects.create(question=question, option_text=opt_text)
 
         return quiz
+
 
 
 class QuizListSerializer(serializers.ModelSerializer):
@@ -253,10 +294,17 @@ class PlanSerializer(serializers.ModelSerializer):
         required=False
     )
 
+    quizzes = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Quiz.objects.all(),
+        required=False
+    )
+
     class Meta:
         model = Plan
         fields = [
             "id",
+            "quizzes",
             "name",
             "description",
             "monthly_price",
@@ -271,13 +319,24 @@ class PlanSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         features_data = validated_data.pop('features', [])
+        quizzes_data = validated_data.pop('quizzes', [])
         plan = Plan.objects.create(**validated_data)
         for feature_text in features_data:
             Feature.objects.create(plan=plan, text=feature_text)
+
+        # Assign quizzes using .set()
+        if quizzes_data:
+            plan.quizzes.set(quizzes_data)
+
+        
+
         return plan
+    
+
 
     def update(self, instance, validated_data):
         features_data = validated_data.pop('features', None)
+        quizzes_data = validated_data.pop('quizzes', None)
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -288,6 +347,9 @@ class PlanSerializer(serializers.ModelSerializer):
             for feature_text in features_data:
                 Feature.objects.create(plan=instance, text=feature_text)
 
+        if quizzes_data is not None:
+            instance.quizzes.set(quizzes_data)
+
         return instance
 
     def to_representation(self, instance):
@@ -296,7 +358,7 @@ class PlanSerializer(serializers.ModelSerializer):
         features_list = [f.text for f in instance.features.all()]
         new_rep = {}
         for key in [
-            "id", "name", "description", "monthly_price", "yearly_price",
+            "id", "quizzes", "name", "description", "monthly_price", "yearly_price",
             "popular", "features", "button_text", "button_variant", "color", "icon"
         ]:
             if key == "features":
