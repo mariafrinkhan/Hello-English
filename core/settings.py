@@ -160,16 +160,6 @@ REST_FRAMEWORK = {
 
 }
 
-# JWT Settings
-SIMPLE_JWT = {
-#    'AUTH_HEADER_TYPES': ('JWT',),
-   'ACCESS_TOKEN_LIFETIME':  timedelta(minutes=240),
-   'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
-   'ROTATE_REFRESH_TOKENS': True,
-   'UPDATE_LAST_LOGIN': False,
-   'AUTH_HEADER_TYPES': ('Bearer',),
-
-}
 
 
 # Internationalization

@@ -5,20 +5,22 @@ from .models import *
 from .serializers import *
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, BasePermission, SAFE_METHODS, IsAdminUser, AllowAny
 from .permissions import *
 
 
 class BannerViewSet(viewsets.ModelViewSet):
     queryset = Banner.objects.all()
     serializer_class = BannerSerializer
+    permission_classes = [AllowAny]
 
-    def get_permissions(self):
-        if self.request.method in ['GET']:  # list + retrieve
-            permission_classes = [IsAuthenticated, IsStudent | IsInstructor]
-        else:  # POST, PUT, PATCH, DELETE
-            permission_classes = [IsAuthenticated, IsInstructor]
-        return [p() for p in permission_classes]
+
+    # def get_permissions(self):
+    #     if self.request.method in ['GET']:  # list + retrieve
+    #         permission_classes = [IsAuthenticated, IsStudent | IsInstructor]
+    #     else:  # POST, PUT, PATCH, DELETE
+    #         permission_classes = [IsAuthenticated, IsInstructor]
+    #     return [p() for p in permission_classes]
 
 # class InstructionViewSet(viewsets.ModelViewSet):
 #     queryset = Instruction.objects.all()
@@ -65,12 +67,14 @@ class InstructionViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(quiz=quiz_id).order_by('page')
         return queryset
     
-    def get_permissions(self):
-        if self.request.method in ['GET']:  # list + retrieve
-            permission_classes = [IsAuthenticated, IsStudent | IsInstructor]
-        else:  # POST, PUT, PATCH, DELETE
-            permission_classes = [IsAuthenticated, IsInstructor]
-        return [p() for p in permission_classes]
+    permission_classes = [AllowAny]
+    
+    # def get_permissions(self):
+    #     if self.request.method in ['GET']:  # list + retrieve
+    #         permission_classes = [IsAuthenticated, IsStudent | IsInstructor]
+    #     else:  # POST, PUT, PATCH, DELETE
+    #         permission_classes = [IsAuthenticated, IsInstructor]
+    #     return [p() for p in permission_classes]
 
 
 
@@ -79,12 +83,27 @@ class QuizViewSet(viewsets.ModelViewSet):
     queryset = Quiz.objects.all()
     serializer_class = QuizSerializer
 
+    # permission_classes = [AllowAny]
+
+    # def get_permissions(self):
+    #     if self.request.method in ['GET']:  # list + retrieve
+    #         permission_classes = [IsAuthenticated, IsStudent | IsInstructor]
+    #     else:  # POST, PUT, PATCH, DELETE
+    #         permission_classes = [IsAuthenticated, IsInstructor]
+    #     return [p() for p in permission_classes]
+
     def get_permissions(self):
-        if self.request.method in ['GET']:  # list + retrieve
-            permission_classes = [IsAuthenticated, IsStudent | IsInstructor]
-        else:  # POST, PUT, PATCH, DELETE
-            permission_classes = [IsAuthenticated, IsInstructor]
-        return [p() for p in permission_classes]
+        if self.request.method in SAFE_METHODS:
+            # GET, HEAD, OPTIONS
+            if self.request.user.is_authenticated:
+                # Authenticated user can view
+                return [IsAuthenticated()]
+            else:
+                # Unauthenticated user can view
+                return [AllowAny()]
+        else:
+            # POST, PUT, PATCH, DELETE → only admin
+            return [IsAdminUser()]
 
     
     
@@ -93,12 +112,14 @@ class QuestionViewSet(viewsets.ModelViewSet):
     queryset = Question.objects.all()
     serializer_class = QuestionSerializer
 
-    def get_permissions(self):
-        if self.request.method in ['GET']:  # list + retrieve
-            permission_classes = [IsAuthenticated, IsStudent | IsInstructor]
-        else:  # POST, PUT, PATCH, DELETE
-            permission_classes = [IsAuthenticated, IsInstructor]
-        return [p() for p in permission_classes]
+    permission_classes = [AllowAny]
+
+    # def get_permissions(self):
+    #     if self.request.method in ['GET']:  # list + retrieve
+    #         permission_classes = [IsAuthenticated, IsStudent | IsInstructor]
+    #     else:  # POST, PUT, PATCH, DELETE
+    #         permission_classes = [IsAuthenticated, IsInstructor]
+    #     return [p() for p in permission_classes]
 
     
 
@@ -111,12 +132,14 @@ class GetQuizViewSet(viewsets.ModelViewSet):
             return QuizListSerializer  # list view: no questions
         return QuizDetailSerializer  # retrieve, create, update, delete
     
-    def get_permissions(self):
-        if self.request.method in ['GET']:  # list + retrieve
-            permission_classes = [IsAuthenticated, IsStudent | IsInstructor]
-        else:  # POST, PUT, PATCH, DELETE
-            permission_classes = [IsAuthenticated, IsInstructor]
-        return [p() for p in permission_classes]
+    permission_classes = [AllowAny]
+    
+    # def get_permissions(self):
+    #     if self.request.method in ['GET']:  # list + retrieve
+    #         permission_classes = [IsAuthenticated, IsStudent | IsInstructor]
+    #     else:  # POST, PUT, PATCH, DELETE
+    #         permission_classes = [IsAuthenticated, IsInstructor]
+    #     return [p() for p in permission_classes]
 
     
 
@@ -126,9 +149,11 @@ class PlanViewSet(viewsets.ModelViewSet):
     queryset = Plan.objects.all()
     serializer_class = PlanSerializer
 
-    def get_permissions(self):
-        if self.request.method in ['GET']:  # list + retrieve
-            permission_classes = [IsAuthenticated, IsStudent | IsInstructor]
-        else:  # POST, PUT, PATCH, DELETE
-            permission_classes = [IsAuthenticated, IsInstructor]
-        return [p() for p in permission_classes]
+    permission_classes = [AllowAny]
+
+    # def get_permissions(self):
+    #     if self.request.method in ['GET']:  # list + retrieve
+    #         permission_classes = [IsAuthenticated, IsStudent | IsInstructor]
+    #     else:  # POST, PUT, PATCH, DELETE
+    #         permission_classes = [IsAuthenticated, IsInstructor]
+    #     return [p() for p in permission_classes]

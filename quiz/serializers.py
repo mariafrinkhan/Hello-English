@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import *
 from deep_translator import GoogleTranslator  # for automatic translation
 from rest_framework.exceptions import ValidationError
+from django.db import transaction
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -129,7 +130,8 @@ class QuizSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Quiz
-        fields = ['id', 'title', 'description', 'timer_duration', 'total_questions', 'instruction', 'all_questions']
+        fields = ['id', 'title', 'description', 'timer_duration', 'total_questions',"can_see_explanation",
+            "instant_feedback", 'instruction', 'all_questions']
 
     def create(self, validated_data):
         instructions_data = validated_data.pop('instruction', [])
@@ -171,7 +173,8 @@ class QuizListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Quiz
-        fields = ["id", "title", "description", "timer_duration", "total_questions","total_instruction_pages", "instruction"]
+        fields = ["id", "title", "description", "timer_duration", "total_questions","total_instruction_pages","can_see_explanation",
+            "instant_feedback", "instruction"]
 
     def get_instruction(self, obj):
         # Include the ID so you can update the instruction later
@@ -238,10 +241,50 @@ class BannerSerializer(serializers.ModelSerializer):
 
 
 class InstructionNestedSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(read_only=True)
     class Meta:
         model = Instruction
         fields = ['id', 'page', 'title_en', 'content']
-        extra_kwargs = {'id': {'read_only': False}}  # allow using id for updates
+        # extra_kwargs = {'id': {'read_only': False}}  # allow using id for updates
+
+# class QuizDetailSerializer(serializers.ModelSerializer):
+#     instructions = InstructionNestedSerializer(many=True, source='instruction')
+#     total_instruction_pages = serializers.SerializerMethodField()
+
+#     class Meta:
+#         model = Quiz
+#         fields = ["id", "title", "description", "timer_duration", "total_questions","total_instruction_pages", "instructions"]
+        
+
+#     def update(self, instance, validated_data):
+#         # Get instructions from validated_data if provided
+#         instructions_data = validated_data.pop('instruction', None)
+
+#         with transaction.atomic():
+#             if instructions_data is not None:
+#                 # Option 1: Replace all instructions
+#                 instance.instruction.clear()
+
+#             # Add new instructions
+#             for instr_data in instructions_data:
+#                 # Remove 'id' if present to avoid UNIQUE errors
+#                 instr_data.pop('id', None)
+#                 instr = Instruction.objects.create(**instr_data)
+#                 instance.instruction.add(instr)
+
+#         # Update other quiz fields
+#         for attr, value in validated_data.items():
+#             setattr(instance, attr, value)
+#         instance.save()
+
+#         return instance
+    
+
+#     def get_total_instruction_pages(self, obj):
+#         # Return the highest page number among instructions
+#         pages = obj.instruction.values_list('page', flat=True)
+#         return max(pages) if pages else 0
+
 
 class QuizDetailSerializer(serializers.ModelSerializer):
     instructions = InstructionNestedSerializer(many=True, source='instruction')
@@ -249,36 +292,57 @@ class QuizDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Quiz
-        fields = ["id", "title", "description", "timer_duration", "total_questions","total_instruction_pages", "instructions"]
-        
+        fields = [
+            "id",
+            "title",
+            "description",
+            "timer_duration",
+            "total_questions",
+            "total_instruction_pages",
+            "can_see_explanation",
+            "instant_feedback",
+            "instructions"
+        ]
+
+    def create(self, validated_data):
+        instructions_data = validated_data.pop('instruction', [])
+
+        with transaction.atomic():
+            # Create the quiz
+            quiz = Quiz.objects.create(**validated_data)
+
+            # Create instructions
+            for instr_data in instructions_data:
+                instr_data.pop('id', None)  # remove id if present
+                instr = Instruction.objects.create(**instr_data)
+                quiz.instruction.add(instr)
+
+        return quiz
 
     def update(self, instance, validated_data):
-        # Get instructions from validated_data if provided
-        instructions_data = validated_data.pop('instruction', None)
+        instructions_data = validated_data.pop('instructions', None)
 
-        if instructions_data is not None:
-            # Option 1: Replace all instructions
-            instance.instruction.clear()
+        with transaction.atomic():
+            # Update other quiz fields
+            for attr, value in validated_data.items():
+                setattr(instance, attr, value)
+            instance.save()
 
-            # Add new instructions
-            for instr_data in instructions_data:
-                # Remove 'id' if present to avoid UNIQUE errors
-                instr_data.pop('id', None)
-                instr = Instruction.objects.create(**instr_data)
-                instance.instruction.add(instr)
-
-        # Update other quiz fields
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
+            if instructions_data is not None:
+                # Clear existing instructions
+                instance.instruction.clear()
+                # Add new instructions
+                for instr_data in instructions_data:
+                    instr_data.pop('id', None)
+                    instr = Instruction.objects.create(**instr_data)
+                    instance.instruction.add(instr)
 
         return instance
-    
 
     def get_total_instruction_pages(self, obj):
-        # Return the highest page number among instructions
         pages = obj.instruction.values_list('page', flat=True)
         return max(pages) if pages else 0
+
 
 
 class FeatureSerializer(serializers.ModelSerializer):

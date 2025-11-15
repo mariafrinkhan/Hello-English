@@ -51,11 +51,20 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 from django.db import models
 
 class UserManager(BaseUserManager):
-    def create_user(self, email, password=None, role='student', **extra_fields):
+    def create_user(self, email, password=None, role='user', **extra_fields):
+        
         if not email:
             raise ValueError('Email is required')
         email = self.normalize_email(email)
-        user = self.model(email=email, role=role, **extra_fields)
+
+        
+
+        user = self.model(
+            
+            email=email, 
+            role=role, 
+            **extra_fields
+        )
         user.set_password(password)
         user.save(using=self._db)
         return user
@@ -63,25 +72,32 @@ class UserManager(BaseUserManager):
     def create_superuser(self, email, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
-        # superuser is always instructor
-        return self.create_user(email, password, role='instructor', **extra_fields)
+        # superuser is always admin
+        return self.create_user(email, password, role='admin', **extra_fields)
 
 
 class User(AbstractBaseUser, PermissionsMixin):
     ROLE_CHOICES = [
-        ('instructor', 'Instructor'),
-        ('student', 'Student'),
+        ('admin', 'Admin'),
+        ('user', 'User'),
     ]
 
     email = models.EmailField(unique=True)
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, null=True, blank=True)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
+
+    
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
 
     objects = UserManager()
+
+    def save(self, *args, **kwargs):
+        if not self.role:
+            self.role = 'user'
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.email} ({self.role})"

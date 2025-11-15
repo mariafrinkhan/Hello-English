@@ -1,20 +1,20 @@
 from rest_framework import permissions
 
-class IsInstructor(permissions.BasePermission):
+class IsAdminUser(permissions.BasePermission):
     """
-    Allows access only to users with role 'instructor'.
+    Allows access only to users with role 'admin'.
     """
 
     def has_permission(self, request, view):
         return bool(
             request.user 
             and request.user.is_authenticated 
-            and request.user.role == 'instructor'
+            and request.user.role == 'admin'
         )
 
-class IsStudent(permissions.BasePermission):
+class IsUser(permissions.BasePermission):
     """
-    Allows access only to users with role 'student'.
+    Allows access only to users with role 'user'.
     Useful for enrollment actions.
     """
 
@@ -22,5 +22,5 @@ class IsStudent(permissions.BasePermission):
         return bool(
             request.user 
             and request.user.is_authenticated 
-            and request.user.role == 'student'
+            and request.user.role == 'user'
         )
