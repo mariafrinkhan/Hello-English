@@ -94,6 +94,14 @@ class QuestionSerializer(serializers.ModelSerializer):
         }
 
 
+# This ListSerializer allows bulk creation
+class QuestionListSerializer(serializers.ModelSerializer):
+    quiz_title = serializers.CharField(source='quiz.title', read_only=True)  # optional: show quiz title
+
+    class Meta:
+        model = Question
+        fields = ['id', 'quiz', 'quiz_title', 'question', 'qus_time', 'options', 'correct_answer', 'explain']
+
 # class QuizSerializer(serializers.ModelSerializer):
 #     all_questions = QuestionSerializer(many=True)
 #     instruction = InstructionSerializer(many=True)
@@ -345,88 +353,88 @@ class QuizDetailSerializer(serializers.ModelSerializer):
 
 
 
-class FeatureSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Feature
-        fields = ['text']
+# class FeatureSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = Feature
+#         fields = ['text']
 
-class PlanSerializer(serializers.ModelSerializer):
-    # Input field for features (write-only)
-    features = serializers.ListField(
-        child=serializers.CharField(),
-        write_only=True,
-        required=False
-    )
+# class PlanSerializer(serializers.ModelSerializer):
+#     # Input field for features (write-only)
+#     features = serializers.ListField(
+#         child=serializers.CharField(),
+#         write_only=True,
+#         required=False
+#     )
 
-    quizzes = serializers.PrimaryKeyRelatedField(
-        many=True,
-        queryset=Quiz.objects.all(),
-        required=False
-    )
+#     quizzes = serializers.PrimaryKeyRelatedField(
+#         many=True,
+#         queryset=Quiz.objects.all(),
+#         required=False
+#     )
 
-    class Meta:
-        model = Plan
-        fields = [
-            "id",
-            "quizzes",
-            "name",
-            "description",
-            "monthly_price",
-            "yearly_price",
-            "popular",
-            "button_text",
-            "button_variant",
-            "color",
-            "icon",
-            "features"
-        ]
+#     class Meta:
+#         model = Plan
+#         fields = [
+#             "id",
+#             "quizzes",
+#             "name",
+#             "description",
+#             "monthly_price",
+#             "yearly_price",
+#             "popular",
+#             "button_text",
+#             "button_variant",
+#             "color",
+#             "icon",
+#             "features"
+#         ]
 
-    def create(self, validated_data):
-        features_data = validated_data.pop('features', [])
-        quizzes_data = validated_data.pop('quizzes', [])
-        plan = Plan.objects.create(**validated_data)
-        for feature_text in features_data:
-            Feature.objects.create(plan=plan, text=feature_text)
+#     def create(self, validated_data):
+#         features_data = validated_data.pop('features', [])
+#         quizzes_data = validated_data.pop('quizzes', [])
+#         plan = Plan.objects.create(**validated_data)
+#         for feature_text in features_data:
+#             Feature.objects.create(plan=plan, text=feature_text)
 
-        # Assign quizzes using .set()
-        if quizzes_data:
-            plan.quizzes.set(quizzes_data)
+#         # Assign quizzes using .set()
+#         if quizzes_data:
+#             plan.quizzes.set(quizzes_data)
 
         
 
-        return plan
+#         return plan
     
 
 
-    def update(self, instance, validated_data):
-        features_data = validated_data.pop('features', None)
-        quizzes_data = validated_data.pop('quizzes', None)
+#     def update(self, instance, validated_data):
+#         features_data = validated_data.pop('features', None)
+#         quizzes_data = validated_data.pop('quizzes', None)
 
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
+#         for attr, value in validated_data.items():
+#             setattr(instance, attr, value)
+#         instance.save()
 
-        if features_data is not None:
-            instance.features.all().delete()
-            for feature_text in features_data:
-                Feature.objects.create(plan=instance, text=feature_text)
+#         if features_data is not None:
+#             instance.features.all().delete()
+#             for feature_text in features_data:
+#                 Feature.objects.create(plan=instance, text=feature_text)
 
-        if quizzes_data is not None:
-            instance.quizzes.set(quizzes_data)
+#         if quizzes_data is not None:
+#             instance.quizzes.set(quizzes_data)
 
-        return instance
+#         return instance
 
-    def to_representation(self, instance):
-        rep = super().to_representation(instance)
-        # Insert features after 'popular'
-        features_list = [f.text for f in instance.features.all()]
-        new_rep = {}
-        for key in [
-            "id", "quizzes", "name", "description", "monthly_price", "yearly_price",
-            "popular", "features", "button_text", "button_variant", "color", "icon"
-        ]:
-            if key == "features":
-                new_rep[key] = features_list
-            else:
-                new_rep[key] = rep.get(key)
-        return new_rep
+#     def to_representation(self, instance):
+#         rep = super().to_representation(instance)
+#         # Insert features after 'popular'
+#         features_list = [f.text for f in instance.features.all()]
+#         new_rep = {}
+#         for key in [
+#             "id", "quizzes", "name", "description", "monthly_price", "yearly_price",
+#             "popular", "features", "button_text", "button_variant", "color", "icon"
+#         ]:
+#             if key == "features":
+#                 new_rep[key] = features_list
+#             else:
+#                 new_rep[key] = rep.get(key)
+#         return new_rep

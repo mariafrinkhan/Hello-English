@@ -145,11 +145,11 @@ class GetQuizViewSet(viewsets.ModelViewSet):
 
 
 
-class PlanViewSet(viewsets.ModelViewSet):
-    queryset = Plan.objects.all()
-    serializer_class = PlanSerializer
+# class PlanViewSet(viewsets.ModelViewSet):
+#     queryset = Plan.objects.all()
+#     serializer_class = PlanSerializer
 
-    permission_classes = [AllowAny]
+#     permission_classes = [AllowAny]
 
     # def get_permissions(self):
     #     if self.request.method in ['GET']:  # list + retrieve
@@ -157,3 +157,22 @@ class PlanViewSet(viewsets.ModelViewSet):
     #     else:  # POST, PUT, PATCH, DELETE
     #         permission_classes = [IsAuthenticated, IsInstructor]
     #     return [p() for p in permission_classes]
+
+
+
+class QuestionBulkViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for bulk creation of questions.
+    Can also list, retrieve, update, delete if needed.
+    """
+    queryset = Question.objects.all()
+    serializer_class = QuestionSerializer
+
+    def create(self, request, *args, **kwargs):
+        # Detect if input is a list (bulk)
+        many = isinstance(request.data, list)
+        serializer = self.get_serializer(data=request.data, many=many)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)

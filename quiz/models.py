@@ -86,26 +86,28 @@ class Option(models.Model):
         return self.option_text
 
 
-class Plan(models.Model):
-    name = models.CharField(max_length=100)
-    description = models.TextField(blank=True)
-    monthly_price = models.DecimalField(max_digits=10, decimal_places=2)
-    yearly_price = models.DecimalField(max_digits=10, decimal_places=2)
-    popular = models.BooleanField(default=False)
-    button_text = models.CharField(max_length=100, blank=True)
-    button_variant = models.CharField(max_length=50, blank=True)
-    color = models.CharField(max_length=20, blank=True)
-    icon = models.CharField(max_length=100, blank=True)
+# class Plan(models.Model):
+#     name = models.CharField(max_length=100)
+#     description = models.TextField(blank=True)
+#     monthly_price = models.DecimalField(max_digits=10, decimal_places=2)
+#     yearly_price = models.DecimalField(max_digits=10, decimal_places=2)
+#     popular = models.BooleanField(default=False)
+#     button_text = models.CharField(max_length=100, blank=True)
+#     button_variant = models.CharField(max_length=50, blank=True)
+#     color = models.CharField(max_length=20, blank=True)
+#     icon = models.CharField(max_length=100, blank=True)
+#     month= models.PositiveIntegerField(default=0)
+#     year= models.PositiveIntegerField(default=1)
 
-    quizzes = models.ManyToManyField('quiz.Quiz', related_name='plans', blank=True)
+#     quizzes = models.ManyToManyField('quiz.Quiz', related_name='plans', blank=True)
 
-    def __str__(self):
-        return self.name
+#     def __str__(self):
+#         return self.name
 
 
-class Feature(models.Model):
-    plan = models.ForeignKey(Plan, related_name='features', on_delete=models.CASCADE)
-    text = models.CharField(max_length=255)
+# class Feature(models.Model):
+#     plan = models.ForeignKey(Plan, related_name='features', on_delete=models.CASCADE)
+#     text = models.CharField(max_length=255)
 
-    def __str__(self):
-        return self.text
+#     def __str__(self):
+#         return self.text

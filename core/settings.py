@@ -1,4 +1,4 @@
-# http://192.168.88.227:8090/
+# http://192.168.88.82:8090/
 from datetime import timedelta
 from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'djoser',
     'authentication',
     'quiz',
+    'subscriptions',
 
     'django_ckeditor_5',
 ]
@@ -128,12 +129,12 @@ AUTH_PASSWORD_VALIDATORS = [
 AUTH_USER_MODEL = 'authentication.User'
 
 
-# SIMPLE_JWT = {
-#     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=5),
-#     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
-#     "ROTATE_REFRESH_TOKENS": False,
-#     "AUTH_HEADER_TYPES": ("Bearer",),
-#     }
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=7),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    # "ROTATE_REFRESH_TOKENS": False,
+    # "AUTH_HEADER_TYPES": ("Bearer",),
+    }
 
 # REST_FRAMEWORK = {
 #     'DEFAULT_AUTHENTICATION_CLASSES': (

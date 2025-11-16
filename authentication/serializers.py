@@ -17,7 +17,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ('id', 'email', 'password', 're_password', 'role')
+        fields = ('id', 'email', 'password', 're_password', 'role',"mobile")
         extra_kwargs = {'password': {'write_only': True}}
 
     def validate(self, attrs):
@@ -28,17 +28,19 @@ class UserCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data.pop('re_password')
         role = validated_data.pop('role', 'user')
+        mobile = validated_data.pop('mobile', None)
 
         return User.objects.create_user(
             email=validated_data['email'],
             password=validated_data['password'],
-            role=role
+            role=role,
+            mobile=mobile
         )
 
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'email', 'role')
+        fields = ('id', 'email', 'role',"mobile")
 
 
