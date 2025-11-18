@@ -114,7 +114,7 @@ class UserSubscriptionSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserSubscription
         fields = ['id', 'user',"mobile", 'plan', 'plan_id', 'start_date', 'end_date', 'active']
-
+# for creating subscription
     def create(self, validated_data):
         user = self.context['request'].user
         plan = validated_data.pop('plan')
