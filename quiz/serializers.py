@@ -139,7 +139,7 @@ class QuizSerializer(serializers.ModelSerializer):
     class Meta:
         model = Quiz
         fields = ['id', 'title', 'description', 'timer_duration', 'total_questions',"can_see_explanation",
-            "instant_feedback", 'instruction', 'all_questions']
+            "instant_feedback", 'icon', 'instruction', 'all_questions']
 
     def create(self, validated_data):
         instructions_data = validated_data.pop('instruction', [])
@@ -182,7 +182,7 @@ class QuizListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Quiz
         fields = ["id", "title", "description", "timer_duration", "total_questions","total_instruction_pages","can_see_explanation",
-            "instant_feedback", "instruction"]
+            "instant_feedback",'icon', "instruction"]
 
     def get_instruction(self, obj):
         # Include the ID so you can update the instruction later
@@ -309,6 +309,7 @@ class QuizDetailSerializer(serializers.ModelSerializer):
             "total_instruction_pages",
             "can_see_explanation",
             "instant_feedback",
+            'icon',
             "instructions"
         ]
 

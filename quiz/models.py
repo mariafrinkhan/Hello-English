@@ -62,6 +62,7 @@ class Quiz(models.Model):
     instruction = models.ManyToManyField(Instruction, blank=True)
     can_see_explanation = models.BooleanField(null=True, blank=True)
     instant_feedback= models.BooleanField(null=True, blank=True)
+    icon=models.FileField(upload_to='assets/uploads/', blank=True, null=True)
     
     def __str__(self):
         return self.title

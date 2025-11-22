@@ -11,12 +11,14 @@ class FeatureSerializer(serializers.ModelSerializer):
         fields = ['text']
 
 class PlanSerializer(serializers.ModelSerializer):
-    # Input field for features (write-only)
+    # features = FeatureSerializer(many=True, write_only=True)  # for input
+    # features_read = FeatureSerializer(many=True, read_only=True, source='features')  # for output
+    
     features = serializers.ListField(
         child=serializers.CharField(),
-        write_only=True,
-        required=False
+        write_only=True
     )
+    # features_list = serializers.SerializerMethodField(read_only=True)
 
     quizzes = serializers.PrimaryKeyRelatedField(
         many=True,
@@ -29,18 +31,21 @@ class PlanSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "quizzes",
-            "name",
+            "title",
             "description",
             "monthly_price",
             "yearly_price",
             "month",
             "year",
             "popular",
-            "button_text",
-            "button_variant",
-            "color",
-            "icon",
+            "discount",
+            "choice",
+            # "discount_type",
+            "monthly_discount",
+            "yearly_discount",
+            # "features_read",
             "features"
+            
         ]
 
     def create(self, validated_data):
@@ -84,12 +89,13 @@ class PlanSerializer(serializers.ModelSerializer):
         # Insert features after 'popular'
         features_list = [f.text for f in instance.features.all()]
         
-        quizzes_list = [{"id": q.id, "title": q.title} for q in instance.quizzes.all()]
+        quizzes_list = [{"id": q.id, "title": q.title, "description": q.description} for q in instance.quizzes.all()]
 
         new_rep = {}
         for key in [
-            "id", "quizzes", "name", "description", "monthly_price", "yearly_price","month", "year",
-            "popular", "features", "button_text", "button_variant", "color", "icon"
+            "id",  "title", "description", "monthly_price", "yearly_price","month", "year", 'discount',"choice","monthly_discount",
+            "yearly_discount",
+            "popular", "features", "quizzes"
         ]:
             if key == "features":
                 new_rep[key] = features_list
@@ -101,30 +107,39 @@ class PlanSerializer(serializers.ModelSerializer):
         return new_rep
     
 
-User = get_user_model()
+# User = get_user_model()
 
 class UserSubscriptionSerializer(serializers.ModelSerializer):
     plan = PlanSerializer(read_only=True)
     user = serializers.StringRelatedField(read_only=True)
-    mobile = serializers.CharField(source="user.mobile", read_only=True)
+    # mobile = serializers.CharField(source="user.mobile", read_only=True)
+    mobile = serializers.CharField(allow_blank=True, allow_null=True, required=False)
     plan_id = serializers.PrimaryKeyRelatedField(
         queryset=Plan.objects.all(), write_only=True, source='plan'
     )
+    
+    
 
     class Meta:
         model = UserSubscription
-        fields = ['id', 'user',"mobile", 'plan', 'plan_id', 'start_date', 'end_date', 'active']
-# for creating subscription
+        fields = ['id', 'user',"mobile", 'plan', 'plan_id','start_date', 'end_date', 'active']
+    
+    # for creating subscription
     def create(self, validated_data):
         user = self.context['request'].user
         plan = validated_data.pop('plan')
-        subscription = UserSubscription.objects.create(user=user, plan=plan)
+        
+
+        subscription = UserSubscription.objects.create(user=user, plan=plan, **validated_data)
         return subscription
     
     def to_representation(self, instance):
         rep = super().to_representation(instance)
         
         
-        rep["plan_title"] = instance.plan.name if instance.plan else None
+        rep["plan_title"] = instance.plan.title if instance.plan else None
+        
+        # rep["discounted_monthly_price"] = instance.discounted_price('month')
+        # rep["discounted_yearly_price"] = instance.discounted_price('year')
 
         return rep

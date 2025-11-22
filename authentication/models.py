@@ -51,16 +51,21 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 from django.db import models
 
 class UserManager(BaseUserManager):
-    def create_user(self, email, password=None, role='user', **extra_fields):
+    def create_user(self,first_name, last_name,username, email, password=None, role='user', **extra_fields):
         
         if not email:
             raise ValueError('Email is required')
         email = self.normalize_email(email)
 
+        if not username:
+            raise ValueError('User must have a username')
+
         
 
         user = self.model(
-            
+            first_name=first_name,
+            last_name=last_name,
+            username=username,
             email=email, 
             role=role, 
             **extra_fields
@@ -69,12 +74,11 @@ class UserManager(BaseUserManager):
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, email, password=None, **extra_fields):
+    def create_superuser(self,first_name, last_name, username, email, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
         # superuser is always admin
-        return self.create_user(email, password, role='admin', **extra_fields)
-
+        return self.create_user(first_name, last_name, username, email, password, role='admin', **extra_fields)
 
 class User(AbstractBaseUser, PermissionsMixin):
     ROLE_CHOICES = [
@@ -82,6 +86,9 @@ class User(AbstractBaseUser, PermissionsMixin):
         ('user', 'User'),
     ]
 
+    first_name = models.CharField(max_length=50, null=True, blank=True)
+    last_name = models.CharField(max_length=50, null=True, blank=True)
+    username = models.CharField(max_length=50, unique=True, null=True, blank=True)
     email = models.EmailField(unique=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, null=True, blank=True)
     is_active = models.BooleanField(default=True)
